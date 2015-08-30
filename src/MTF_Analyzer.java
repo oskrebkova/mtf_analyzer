@@ -245,7 +245,6 @@ class TestFrame extends Frame{
 	private Panel centralPanel; 
 	private ArrayList<ParticlePanel> particles = new ArrayList<ParticlePanel>();
 	private Image iconImage = new ImageIcon(this.getClass().getResource("/star.png")).getImage();
-			//Toolkit.getDefaultToolkit().getImage("c:/Users/Olga/Desktop/Screenshot_16.png");
 	
 	private Dialog dialog;
 	{
@@ -261,7 +260,6 @@ class TestFrame extends Frame{
 		controllers.add(new MTFController(this));
 		controllers.add(new StarMTFController(this));
 		this.setBackground(Color.GRAY);
-		Toolkit.getDefaultToolkit().getImage(this.getClass().getClassLoader().getResource("/star.png"));
 	}
 	
 	TestFrame(){}
@@ -1133,7 +1131,7 @@ class ImagePanel extends Panel{
         super.paint(g);
         g.drawImage(starImage, 0, 0, null);          
     }
-    public Dimension getPreferredSize()
+   public Dimension getPreferredSize()
     {
         return new Dimension(starImage.getWidth(this), starImage.getHeight(this));
     }
@@ -1601,7 +1599,7 @@ class ParticleListener implements Varificator, MouseListener, KeyListener{
 				public void mouseClicked(MouseEvent et) {
 					
 					controller.getMainFrame().hideInstructions();
-					starImage = ((ImageCanvas)e.getSource()).getImage();
+					starImage = ((ImageCanvas)et.getSource()).getImage();
 					int pointerX = starImage.getCanvas().offScreenX(et.getX())-14;
 			        int pointerY = starImage.getCanvas().offScreenY(et.getY())-14;
 			        int centerX = starImage.getCanvas().offScreenX(et.getX());
