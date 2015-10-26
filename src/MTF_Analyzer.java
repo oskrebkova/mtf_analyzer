@@ -554,7 +554,7 @@ class CalibrationDetails extends Frame implements Observer{
 			for(int imageID : WindowManager.getIDList()){
 				WindowManager.getImage(imageID).getCanvas().addMouseListener(listener);
 				WindowManager.getImage(imageID).getCanvas().addKeyListener(listener);
-				//System.out.println("MouseListener " + calibrationDetailsListener +" for image " + imageID + " added");
+				System.out.println("MouseListener " + listener +" for image " + imageID + " added");
 				//System.out.println(listener == (CalibrationDetailsListener)(controller.getListener(this)));
 			}
 		}
@@ -573,6 +573,7 @@ class CalibrationDetails extends Frame implements Observer{
 	@Override
 	public void update(Observable observable) {
 		if(observable.getOperation() == Observable.PAINT){
+			System.out.println("CalibDetails got command to paint from " + observable);
 			if(!selectedValues.getText().isEmpty()){
 				selectedValues.append("\n" + ((CalibrationDetailsListener)observable).getCurrentColorValue());
 			}else{
@@ -614,7 +615,7 @@ class CalibrationOverlay extends ImagePlus implements Observer{
 	
 	CalibrationOverlay(ImagePlus calibrationImage){
 		this.calibrationImage = calibrationImage;
-		//System.out.println("New Calibration overlay " + this.getID() + " for image " + calibrationImage + " is created");
+		System.out.println("New Calibration overlay " + this.getID() + " for image " + calibrationImage + " is created");
 	}
 	public ImagePlus getCalibrationImage(){
 		return calibrationImage;
@@ -622,8 +623,8 @@ class CalibrationOverlay extends ImagePlus implements Observer{
 	@Override
 	public void update(Observable observable) {
 		if(observable.getOperation() == Observable.PAINT){
-			//System.out.println("Observable " + observable);
-			//System.out.println("roi in update : "+ calibrationImage.getRoi());
+			System.out.println("Observable " + observable);
+			System.out.println("roi in update : "+ calibrationImage.getRoi());
 			Roi roi = (Roi)calibrationImage.getRoi().clone();
 			calibrationImage.deleteRoi();
 			roi.setStrokeColor(Color.BLUE);
@@ -644,7 +645,7 @@ class CalibrationOverlay extends ImagePlus implements Observer{
 			CustomUtils.resetRoiColor();
 		}
 		else if(observable.getOperation() == Observable.CLOSE){
-			//System.out.println("In close");
+			System.out.println(overlay);
 			overlay.clear();
 			//calibrationImage.repaintWindow();
 			ImageProcessor originalProcessor = ((CalibrationDetailsListener)observable).getOriginalProcessor();
@@ -1772,6 +1773,7 @@ class OECFAdjustmentListener extends Listener implements ItemListener, ActionLis
 				if(WindowManager.getImageCount() > 0){
 					for(int imageID : WindowManager.getIDList()){
 						WindowManager.getImage(imageID).getCanvas().removeMouseListener((CalibrationDetailsListener)calibrationDetailsListener);
+						WindowManager.getImage(imageID).getCanvas().removeKeyListener((CalibrationDetailsListener)calibrationDetailsListener);
 					}
 				}
 				ImagePlus.removeImageListener((CalibrationDetailsListener)calibrationDetailsListener);
@@ -1781,6 +1783,7 @@ class OECFAdjustmentListener extends Listener implements ItemListener, ActionLis
 		removeListeners();
 		controller.setCalibrationIsInProgress(false);
 		calibrationDetailsListener.disposeGUI();
+		calibrationDetailsListener.removeObserver(calibrationWindow);
 		calibrationWindow.dispose();
 		calibrationWindow = null;
 		calibrationDetailsListener = null;
@@ -1865,6 +1868,7 @@ class CalibrationDetailsListener extends OECFAdjustmentListener implements ItemL
 	public void disposeGUI() {
 		currentOperation = Observable.CLOSE;
 		notifyObservers();
+		if(observers.contains(calibrationOverlay))observers.remove(calibrationOverlay);
 		calibrationOverlay = null;
 		calibrationImageID = null;
 	}
@@ -1938,6 +1942,9 @@ class CalibrationDetailsListener extends OECFAdjustmentListener implements ItemL
 	public void setObserver(Observer observer) {
 		observers.add(observer);		
 	}
+	protected void removeObserver(Observer o){
+		observers.remove(o);
+	}
 
 	@Override
 	public void notifyObservers() {
@@ -1970,50 +1977,57 @@ class CalibrationDetailsListener extends OECFAdjustmentListener implements ItemL
 		return userDefinedColorValues;
 	}
 	private void overwork(InputEvent e){
-		if (calibrationImageID == null){
-			calibrationImageID = ((ImagePlus)((ImageCanvas)e.getSource()).getImage()).getID();
-			calibrationImage = WindowManager.getImage(calibrationImageID);
-			bitDepth = calibrationImage.getBitDepth();
-			System.out.println("bitDepth " + bitDepth);
-			//System.out.println("bitDepth != 8 " + (bitDepth != 8));
-			//System.out.println("bitDepth != 16 " + (bitDepth != 16));
-			if(bitDepth != 8 && bitDepth != 16){
-				System.out.println("Processor convertion");
-				calibrationImage.setProcessor(calibrationImage.getProcessor().convertToByteProcessor());
-				//calibrationImage.getProcessor().getBitDepth();
+		if(controller.calibrationIsInProgress()){
+			if (calibrationImageID == null){
+				calibrationImageID = ((ImagePlus)((ImageCanvas)e.getSource()).getImage()).getID();
+				calibrationImage = WindowManager.getImage(calibrationImageID);
 				bitDepth = calibrationImage.getBitDepth();
-				System.out.println(bitDepth);
+				System.out.println("bitDepth " + bitDepth);
+				//System.out.println("bitDepth != 8 " + (bitDepth != 8));
+				//System.out.println("bitDepth != 16 " + (bitDepth != 16));
+				if(bitDepth != 8 && bitDepth != 16){
+					System.out.println("Processor convertion");
+					calibrationImage.setProcessor(calibrationImage.getProcessor().convertToByteProcessor());
+					//calibrationImage.getProcessor().getBitDepth();
+					bitDepth = calibrationImage.getBitDepth();
+					System.out.println(bitDepth);
+				}
+				
+				//assert bitDepth == 8 || bitDepth == 16;
+				
+				originalProcessor = CustomUtils.cloneProcessor(calibrationImage);
+				//System.out.println("Saveing copy of original Image " + originalProcessor.getID());
+				calibrationOverlay = new CalibrationOverlay(calibrationImage); 
+				this.setObserver(calibrationOverlay);
+				//System.out.println("New CalibrationOverlay created");
 			}
-			
-			//assert bitDepth == 8 || bitDepth == 16;
-			
-			originalProcessor = CustomUtils.cloneProcessor(calibrationImage);
-			//System.out.println("Saveing copy of original Image " + originalProcessor.getID());
-			calibrationOverlay = new CalibrationOverlay(calibrationImage); 
-			this.setObserver(calibrationOverlay);
-			//System.out.println("id set");
-		}
-		if(((ImagePlus)((ImageCanvas)e.getSource()).getImage()).getID() == calibrationImageID){
-			System.out.println("id = calibImgID");
-			Roi currentRoi = calibrationImage.getRoi();
-			if( currentRoi != null){
-				//System.out.println("currentRoi " + currentRoi);
-				currentOperation = Observable.PAINT;
-				
-				//TODO Write down roi in selectedColorValues
-				Analyzer analyzer = new Analyzer(currentRoi.getImage());
-				if(ResultsTable.getResultsTable().getCounter()>0){ResultsTable.getResultsTable().deleteRow(0);}
-				analyzer.measure();
-				
-				//analyzer.displayResults();
-				ResultsTable table = ResultsTable.getResultsTable(); 
-				currentColorValue = df.format(table.getValueAsDouble(1, 0));
-				
-				//selectedColorValues.add(currentColorValue);
-				notifyObservers();
+			if(((ImagePlus)((ImageCanvas)e.getSource()).getImage()).getID() == calibrationImageID){
+				System.out.println("id = calibImgID");
+				Roi currentRoi = calibrationImage.getRoi();
+				System.out.println(calibrationImage.getRoi());
+				if( currentRoi != null){
+					System.out.println("currentRoi " + currentRoi);
+					currentOperation = Observable.PAINT;
+					
+					//TODO Write down roi in selectedColorValues
+					Analyzer analyzer = new Analyzer(currentRoi.getImage());
+					if(ResultsTable.getResultsTable().getCounter()>0){ResultsTable.getResultsTable().deleteRow(0);}
+					analyzer.measure();
+					
+					//analyzer.displayResults();
+					ResultsTable table = ResultsTable.getResultsTable(); 
+					currentColorValue = df.format(table.getValueAsDouble(1, 0));
+					boolean containsDetails = false;
+					for(Observer o: observers){
+						if(o instanceof CalibrationDetails)containsDetails = true;
+					}
+					System.out.println("DetailsWindow is in observable : " + containsDetails);
+					//selectedColorValues.add(currentColorValue);
+					notifyObservers();
+				}
+			}else{
+				controller.getMainFrame().showInstructionsDialog("Please, complete the calibration!");
 			}
-		}else{
-			controller.getMainFrame().showInstructionsDialog("Please, complete the calibration!");
 		}
 	}
 	@Override
@@ -2060,6 +2074,7 @@ class CalibrationDetailsListener extends OECFAdjustmentListener implements ItemL
 			int imageID = imp.getID();
 			
 			WindowManager.getImage(imageID).getCanvas().addMouseListener(this);
+			WindowManager.getImage(imageID).getCanvas().addKeyListener(this);
 			//System.out.println("CalibrationDetailsListener: MouseListener " + this + "  for just opened image " + imageID + " removed");
 		}
 		
@@ -2071,6 +2086,7 @@ class CalibrationDetailsListener extends OECFAdjustmentListener implements ItemL
 			//int imageID = imp.getID();
 			
 			imp.getCanvas().removeMouseListener(this);
+			imp.getCanvas().removeKeyListener(this);
 			//System.out.println("CalibrationDetailsListener: MouseListener " + this + "  for just opened image " + imageID + " removed");
 		}
 		
